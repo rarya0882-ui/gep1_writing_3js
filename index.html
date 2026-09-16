@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D English Quest: Writing & Reading Challenge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; }
+    h1, .btn-primary, .btn-action, #vn-speaker, #vn-stage-title, .letter-badge { font-family: 'Baloo 2', 'Segoe UI', sans-serif; }
+    
+    #game-canvas { width: 100%; height: 100%; display: block; }
+
+    /* Modal Screens */
+    .screen-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column;
+      justify-content: center; align-items: center; z-index: 100; color: #fff; padding: 20px;
+    }
+    
+    .screen-overlay { background: radial-gradient(circle at 50% 20%, rgba(59,130,246,0.25), rgba(0,0,0,0.9) 70%); }
+
+    .card {
+      background: #1e293b; border: 3px solid #3b82f6; border-radius: 20px;
+      padding: 24px; width: 100%; max-width: 480px; box-shadow: 0 10px 30px rgba(59,130,246,0.35);
+      text-align: center; animation: popIn 0.4s ease;
+    }
+
+    .card h1 { font-size: 2rem; color: #60a5fa; margin-bottom: 8px; animation: bounceSlow 2.4s ease-in-out infinite; }
+    .card p { font-size: 0.95rem; color: #94a3b8; margin-bottom: 20px; }
+
+    .input-group { margin-bottom: 14px; text-align: left; }
+    .input-group label { display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 4px; }
+    .input-group input {
+      width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569;
+      background: #0f172a; color: #fff; font-size: 1rem; outline: none;
+    }
+    .input-group input:focus { border-color: #3b82f6; }
+
+    .btn-primary {
+      width: 100%; padding: 14px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none;
+      border-radius: 12px; font-size: 1.1rem; font-weight: 700; cursor: pointer;
+      margin-top: 10px; transition: transform 0.12s ease, filter 0.12s ease;
+      box-shadow: 0 4px 0 #1d4ed8;
+    }
+    .btn-primary:active { filter: brightness(0.95); transform: translateY(3px) scale(0.98); box-shadow: 0 1px 0 #1d4ed8; }
+
+    /* Touch D-Pad */
+    #dpad {
+      position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px;
+      z-index: 10; display: none; grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr); gap: 5px;
+    }
+    .dbtn {
+      background: rgba(255, 255, 255, 0.25); border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 10px; display: flex; justify-content: center; align-items: center;
+      color: #fff; font-weight: bold; font-size: 1.2rem; touch-action: manipulation;
+    }
+    .dbtn:active { background: rgba(59, 130, 246, 0.6); }
+
+    /* Talk Button */
+    #talk-btn {
+      position: absolute; bottom: 40px; right: 30px; z-index: 10; display: none;
+      padding: 16px 28px; background: #22c55e; color: #fff; border: none;
+      border-radius: 50px; font-size: 1.2rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+
+    /* HUD Top Bar */
+    #hud {
+      position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; gap: 10px;
+      background: rgba(15, 23, 42, 0.8); padding: 8px 16px; border-radius: 20px; border: 1px solid #334155;
+      color: #cbd5e1; font-size: 0.9rem;
+    }
+
+    /* Visual Novel Overlay Layout */
+    #vn-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 50; display: none; background: rgba(0, 0, 0, 0.35); pointer-events: auto;
+    }
+
+    /* Elevated Portrait Container */
+    #vn-portrait-container {
+      position: absolute; bottom: 0; left: 2%; width: 340px; height: 550px;
+      z-index: 5; pointer-events: none; display: flex; align-items: flex-end;
+    }
+    #vn-portrait { width: 100%; height: auto; max-height: 100%; object-fit: contain; transform: translateY(-40px); }
+
+    /* Dialogue box placed ON TOP of portrait lower waist */
+    #vn-box {
+      position: absolute; bottom: 0; left: 0; width: 100%; z-index: 10;
+      min-height: 200px; max-height: 48%; background: rgba(15, 23, 42, 0.95);
+      border-top: 3px solid #3b82f6; padding: 14px 20px; display: flex; flex-direction: column;
+      gap: 8px; overflow-y: auto; color: #fff; box-shadow: 0 -5px 25px rgba(0,0,0,0.7);
+    }
+
+    #vn-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+    #vn-speaker { font-size: 1.1rem; font-weight: bold; color: #60a5fa; }
+    #vn-stage-title { font-size: 0.85rem; color: #f59e0b; font-weight: bold; }
+
+    /* Interactive Elements in VN */
+    .sentence-pool, .target-paragraph {
+      display: flex; flex-wrap: wrap; gap: 8px; min-height: 44px; padding: 8px;
+      background: #0f172a; border: 1px dashed #475569; border-radius: 12px; margin-top: 4px;
+    }
+
+    /* Paragraph slot boxes */
+    .slot {
+      width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+      border-radius: 10px; margin-bottom: 6px; font-size: 0.85rem; transition: all 0.15s;
+    }
+    .slot.empty {
+      background: repeating-linear-gradient(45deg, #0f172a, #0f172a 10px, #131d31 10px, #131d31 20px);
+      border: 2px dashed #475569; min-height: 44px; justify-content: center;
+    }
+    .slot.empty .slot-placeholder { color: #64748b; font-style: italic; font-size: 0.8rem; }
+    .slot.filled {
+      background: #1e293b; border: 2px solid #f59e0b; color: #f8fafc; cursor: pointer;
+      animation: popIn 0.25s ease;
+    }
+    .slot.filled.locked { background: #064e3b; border-color: #10b981; cursor: default; }
+    .slot.drag-over { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,0.4); transform: scale(1.02); }
+    .slot .slot-text { flex: 1; line-height: 1.35; }
+    .slot .slot-hint { font-size: 0.65rem; color: #94a3b8; white-space: nowrap; }
+    .slot .lock-check { font-size: 1rem; }
+
+    /* Pool cards (the draggable/tappable sentence cards) */
+    .pool-card {
+      width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+      background: #1e293b; border: 2px solid #3b82f6; border-radius: 10px; color: #f8fafc;
+      font-size: 0.85rem; cursor: grab; margin-bottom: 6px; transition: all 0.15s;
+      animation: popIn 0.25s ease;
+    }
+    .pool-card:active { cursor: grabbing; transform: scale(0.97); }
+    .pool-card:hover { border-color: #60a5fa; background: #24344f; }
+
+    .letter-badge {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #3b82f6;
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.8rem;
+    }
+    .letter-badge.locked { background: #10b981; }
+
+    /* Progress bar */
+    .progress-track { width: 100%; height: 8px; background: #0f172a; border-radius: 6px; overflow: hidden; border: 1px solid #334155; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #22c55e, #4ade80); transition: width 0.3s ease; border-radius: 6px; }
+
+    .vn-controls { display: flex; gap: 10px; margin-top: 6px; }
+    .btn-action {
+      flex: 1; padding: 12px; background: #3b82f6; color: #fff; border: none;
+      border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 1rem;
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+    .btn-action.secondary { background: #64748b; }
+    .btn-action:active { filter: brightness(0.9); transform: scale(0.97); }
+    .btn-fun { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 4px 0 #15803d; }
+    .btn-fun:active { box-shadow: 0 1px 0 #15803d; transform: translateY(3px) scale(0.98); }
+
+    #full-text-display { font-size: 0.9rem; line-height: 1.6; color: #cbd5e1; background: #0f172a; padding: 14px; border-radius: 10px; border: 1px solid #334155; }
+
+    /* Animations */
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.85) translateY(4px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .pop-in { animation: popIn 0.3s ease; }
+
+    @keyframes shakeAnim {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+    #vn-box.shake { animation: shakeAnim 0.4s ease; }
+
+    @keyframes confettiFall {
+      0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(360deg); opacity: 0.9; }
+    }
+    .confetti-piece {
+      position: fixed; top: 0; z-index: 200; pointer-events: none;
+      animation-name: confettiFall; animation-timing-function: ease-in;
+    }
+
+    @keyframes bouncePortrait {
+      0%, 100% { transform: translateY(-40px); }
+      50% { transform: translateY(-46px); }
+    }
+    #vn-portrait { animation: bouncePortrait 2.4s ease-in-out infinite; }
+
+    @keyframes bounceSlow {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <!-- Audio -->
+  <audio id="bgm" loop src="day.mp3"></audio>
+
+  <!-- Login Overlay -->
+  <div id="login-screen" class="screen-overlay">
+    <div class="card">
+      <h1>🗺️ 3D English Quest</h1>
+      <p>Meet 4 characters around town and arrange their scrambled paragraphs. Topic sentence first, concluding sentence last! ⏱️</p>
+      <div class="input-group">
+        <label>🧑 Player Name (max 10 chars)</label>
+        <input type="text" id="input-name" maxlength="10" placeholder="e.g. Alex">
+      </div>
+      <div class="input-group">
+        <label>🏫 Class (max 10 chars)</label>
+        <input type="text" id="input-class" maxlength="10" placeholder="e.g. 10-A">
+      </div>
+      <div class="input-group">
+        <label>📅 Day (max 10 chars)</label>
+        <input type="text" id="input-day" maxlength="10" placeholder="e.g. Monday">
+      </div>
+      <button class="btn-primary" onclick="startGame()">🚀 Start Game</button>
+    </div>
+  </div>
+
+  <!-- End Game Screen -->
+  <div id="end-screen" class="screen-overlay" style="display: none;">
+    <div class="card">
+      <h1 style="color: #4ade80;">🏆 Quest Completed!</h1>
+      <p>Amazing work! You arranged all 4 paragraphs correctly. Take a screenshot of this card to submit your result. 📸</p>
+      <div style="background: #0f172a; padding: 16px; border-radius: 12px; text-align: left; margin-bottom: 16px; border: 1px solid #334155;">
+        <p>🧑 <strong>Name:</strong> <span id="res-name"></span></p>
+        <p>🏫 <strong>Class:</strong> <span id="res-class"></span></p>
+        <p>📅 <strong>Day:</strong> <span id="res-day"></span></p>
+        <p>⏱️ <strong>Total Time:</strong> <span id="res-time" style="color: #f59e0b; font-weight: bold;"></span></p>
+      </div>
+      <button class="btn-primary" onclick="location.reload()">🔁 Exit Game</button>
+    </div>
+  </div>
+
+  <!-- Game HUD -->
+  <div id="hud">
+    <div>Time: <span id="hud-timer" style="color: #f59e0b; font-weight: bold;">00:00</span></div>
+    <div>| Unit: <span id="hud-unit">1 / 4</span></div>
+  </div>
+
+  <!-- Mobile D-Pad -->
+  <div id="dpad">
+    <div></div>
+    <div class="dbtn" id="btn-up">▲</div>
+    <div></div>
+    <div class="dbtn" id="btn-left">◄</div>
+    <div></div>
+    <div class="dbtn" id="btn-right">►</div>
+    <div></div>
+    <div class="dbtn" id="btn-down">▼</div>
+    <div></div>
+  </div>
+
+  <!-- Talk Interaction Button -->
+  <button id="talk-btn" onclick="triggerDialogue()">TALK</button>
+
+  <!-- Visual Novel Overlay -->
+  <div id="vn-overlay">
+    <div id="vn-portrait-container">
+      <img id="vn-portrait" src="alex_neutral.png" alt="NPC Portrait">
+    </div>
+    <div id="vn-box">
+      <div id="vn-header">
+        <span id="vn-speaker">Alex</span>
+        <span id="vn-stage-title">Introduction</span>
+      </div>
+      
+      <div id="vn-body">
+        <!-- Dynamic Content Injected Here -->
+      </div>
+    </div>
+  </div>
+
+  <canvas id="game-canvas"></canvas>
+
+  <script>
+    /* ==========================================================================
+       1. SYNTHESIZED WEB AUDIO SFX SYSTEM
+       ========================================================================== */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSFX(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+
+      if (type === 'click') {
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+        osc.start(now); osc.stop(now + 0.05);
+      } else if (type === 'correct') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+        osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now); osc.stop(now + 0.3);
+      } else if (type === 'wrong') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.linearRampToValueAtTime(110, now + 0.2);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now); osc.stop(now + 0.2);
+      } else if (type === 'win') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.12);
+        osc.frequency.setValueAtTime(783.99, now + 0.24);
+        osc.frequency.setValueAtTime(1046.50, now + 0.36);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+        osc.start(now); osc.stop(now + 0.6);
+      }
+    }
+
+    /* ==========================================================================
+       2. CURRICULUM DATA STRUCTURE
+       ========================================================================== */
+    const UNITS = [
+      {
+        id: 1, title: "Safe Internet Tips", npcName: "Alex", emoji: "🛡️",
+        greeting: "Hey there! 👋 I'm Alex. My Internet Safety Guide got all mixed up! Can you drag the sentence cards into the right order? Remember: topic sentence on top, concluding sentence at the bottom!",
+        poses: { neutral: "alex_neutral.png", thinking: "alex_thinking.png", happy: "alex_happy.png" },
+        fullParagraph: "The Internet is useful, but we should use it carefully. Cyber bullying can hurt people, so we should not send mean messages to others. We should also be careful when talking to a stranger online. Some people share a hoax, so we should check information before we believe it. We should never give our password to someone because it may be a phishing attack or a romance scam. Sometimes, a computer can crash because it is infected with a virus. Fake websites can also steal our personal information. We should follow these simple tips to stay safe on the Internet.",
+        sentences: [
+          ["The Internet", "is", "useful,", "but", "we should", "use", "it", "carefully."],
+          ["Cyber bullying", "can", "hurt", "people,", "so", "we should", "not", "send", "mean messages", "to others."],
+          ["We", "should", "also", "be", "careful", "when", "talking", "to", "a stranger", "online."],
+          ["Some people", "share", "a hoax,", "so", "we should", "check", "information", "before", "we believe it."],
+          ["We should", "never", "give", "our password", "to someone", "because", "it", "may", "be", "a phishing attack", "or", "a romance scam."],
+          ["Sometimes,", "a computer", "can", "crash", "because", "it is", "infected", "with", "a virus."],
+          ["Fake websites", "can", "also", "steal", "our personal", "information."],
+          ["We should", "follow", "these simple tips", "to stay", "safe", "on the Internet."]
+        ]
+      },
+      {
+        id: 2, title: "Movie Review", npcName: "Maya", emoji: "🎬",
+        greeting: "Hi! 🎬 I'm Maya. I dropped my movie review cards everywhere! Help me put them back in order — topic sentence first, conclusion last!",
+        poses: { neutral: "maya_neutral.png", thinking: "maya_thinking.png", happy: "maya_happy.png" },
+        fullParagraph: "Last weekend, I watched an exciting movie with my friends. The movie was about a hero who saved his city from a dangerous monster. The story was epic, and the special effects were brilliant. I was very excited when the hero fought the monster. However, some parts were boring because the story was too slow. The romantic scenes were also a little cheesy and predictable. Overall, I thought the movie was excellent, although some people might think it was terrible. I would recommend this movie to people who enjoy exciting action stories.",
+        sentences: [
+          ["Last weekend,", "I watched", "an exciting movie", "with my friends."],
+          ["The movie", "was about", "a hero", "who", "saved", "his city", "from", "a dangerous monster."],
+          ["The story", "was", "epic,", "and", "the special effects", "were", "brilliant."],
+          ["I was", "very excited", "when", "the hero", "fought", "the monster."],
+          ["However,", "some parts", "were", "boring", "because", "the story", "was too slow."],
+          ["The romantic scenes", "were", "also", "a little", "cheesy", "and predictable."],
+          ["Overall,", "I thought", "the movie", "was excellent,", "although", "some people", "might think", "it was terrible."],
+          ["I would recommend", "this movie", "to people", "who", "enjoy", "exciting action stories."]
+        ]
+      },
+      {
+        id: 3, title: "Collecting Items", npcName: "Sam", emoji: "⚽",
+        greeting: "Welcome! ⚽ I'm Sam. My story about my football card collection is totally scrambled! Can you arrange the sentence cards in the correct order?",
+        poses: { neutral: "sam_neutral.png", thinking: "sam_thinking.png", happy: "sam_happy.png" },
+        fullParagraph: "I started collecting football cards when I was twelve years old. Last year, I went hunting for collectibles at a small market near my house. I found three old cards, but I did not buy them because they were too expensive. My favorite card was my brother's, but he gave it to me for my birthday. I also bought a special card from a collector in Jakarta. I was very happy because the card was from my favorite football team. Collecting cards has given me many interesting experiences. Now, I want to find more rare cards and share my collection with an online community.",
+        sentences: [
+          ["I started", "collecting football cards", "when", "I", "was twelve years old."],
+          ["Last year,", "I went", "hunting for collectibles", "at a small market", "near my house."],
+          ["I found", "three old cards,", "but", "I did not buy them", "because", "they were too expensive."],
+          ["My favorite card", "was", "my brother's,", "but", "he gave it", "to me", "for my birthday."],
+          ["I also bought", "a special card", "from a collector", "in Jakarta."],
+          ["I was very happy", "because", "the card", "was from", "my favorite football team."],
+          ["Collecting cards", "has given me", "many interesting experiences."],
+          ["Now,", "I want to find", "more rare cards", "and", "share my collection", "with an online community."]
+        ]
+      },
+      {
+        id: 4, title: "Holiday Food", npcName: "Mayor", emoji: "🍽️",
+        greeting: "Greetings! 🍽️ I am the Mayor. Our holiday food story got scrambled before the feast! Please drag the sentence cards into the correct order to save the day!",
+        poses: { neutral: "mayor_neutral.png", thinking: "mayor_thinking.png", happy: "mayor_happy.png" },
+        fullParagraph: "During Eid, my family prepares many delicious foods for our holiday celebration. One of my favorite foods is rendang, which is made with beef, coconut milk, and spices. The meat is tender, rich, and very flavorful. My mother usually puts together the ingredients and cooks the rendang for several hours. We also serve rice, vegetables, and traditional snacks for our guests. The food smells wonderful, and everyone enjoys eating together. My favorite part is when our relatives come over and we share the holiday meal. For me, holiday food is special because it brings family and friends together.",
+        sentences: [
+          ["During Eid,", "my family prepares", "many delicious foods", "for our holiday celebration."],
+          ["One of my favorite foods", "is rendang,", "which", "is made with", "beef,", "coconut milk,", "and spices."],
+          ["The meat", "is", "tender,", "rich,", "and", "very flavorful."],
+          ["My mother", "usually puts together", "the ingredients", "and", "cooks the rendang", "for", "several hours."],
+          ["We also serve", "rice,", "vegetables,", "and", "traditional snacks", "for our guests."],
+          ["The food", "smells wonderful,", "and", "everyone", "enjoys", "eating together."],
+          ["My favorite part", "is when", "our relatives", "come over", "and", "we share", "the holiday meal."],
+          ["For me,", "holiday food", "is", "special", "because", "it brings", "family and friends", "together."]
+        ]
+      }
+    ];
+
+    /* ==========================================================================
+       3. GAME STATE MANAGEMENT
+       ========================================================================== */
+    let playerData = { name: '', class: '', day: '', startTime: 0, totalTimeSec: 0 };
+    let timerInterval = null;
+    let currentUnitIdx = 0;
+    let unitProgress = [
+      { visited: false, cleared: false },
+      { visited: false, cleared: false },
+      { visited: false, cleared: false },
+      { visited: false, cleared: false }
+    ];
+
+    let sentencePool = [];   // [{ letter, text }] sentence cards waiting to be placed
+    let slots = [];          // length = unit.sentences.length; each null | { letter, text, locked }
+    let dragLetter = null;   // letter currently being dragged
+    let isNearNPC = false;
+    let activeNPCIdx = null;
+
+    /* ==========================================================================
+       4. THREE.JS 3D ENGINE (STYLED 3D NPC MODELS)
+       ========================================================================== */
+    let scene, camera, renderer;
+    let player, npcs = [];
+    let keys = { w: false, a: false, s: false, d: false };
+    let touchMove = { up: false, down: false, left: false, right: false };
+
+    function createStylizedNPC(colorHex) {
+      const group = new THREE.Group();
+      
+      // Base Pedestal Ring
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 0.2, 16), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+      ring.position.y = 0.1;
+      group.add(ring);
+
+      // Torso
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.4, 16), new THREE.MeshLambertMaterial({ color: colorHex }));
+      torso.position.y = 0.9;
+      torso.castShadow = true;
+      group.add(torso);
+
+      // Head
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), new THREE.MeshLambertMaterial({ color: 0xffedd5 }));
+      head.position.y = 1.8;
+      head.castShadow = true;
+      group.add(head);
+
+      return group;
+    }
+
+    function init3D() {
+      const container = document.getElementById('game-canvas');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87ceeb);
+      scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      renderer = new THREE.WebGLRenderer({ canvas: container, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+
+      // Lights
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(40, 60, 20);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      // Ground
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      createTownEnvironment();
+
+      // Player
+      player = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
+      player.position.set(0, 1, 10);
+      player.castShadow = true;
+      scene.add(player);
+
+      // Spawn 4 Stylized NPCs
+      const npcColors = [0xef4444, 0xec4899, 0x8b5cf6, 0xf59e0b];
+      const npcPositions = [ { x: 0, z: 0 }, { x: -12, z: -10 }, { x: 12, z: -10 }, { x: 0, z: -25 } ];
+
+      for (let i = 0; i < 4; i++) {
+        const npc = createStylizedNPC(npcColors[i]);
+        npc.position.set(npcPositions[i].x, 0, npcPositions[i].z);
+        scene.add(npc);
+        npcs.push(npc);
+      }
+
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('keydown', e => handleKey(e.code, true));
+      window.addEventListener('keyup', e => handleKey(e.code, false));
+
+      setupTouchControls();
+      animate();
+    }
+
+    function createTownEnvironment() {
+      const lake = new THREE.Mesh(new THREE.CircleGeometry(12, 32), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+      lake.rotation.x = -Math.PI / 2;
+      lake.position.set(-25, 0.1, -15);
+      scene.add(lake);
+
+      const bGeo = new THREE.BoxGeometry(8, 10, 8);
+      const bMat = new THREE.MeshLambertMaterial({ color: 0x64748b });
+      const b1 = new THREE.Mesh(bGeo, bMat); b1.position.set(20, 5, 5); scene.add(b1);
+      const b2 = new THREE.Mesh(bGeo, bMat); b2.position.set(-20, 5, 15); scene.add(b2);
+
+      for (let i = 0; i < 20; i++) {
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 3), new THREE.MeshLambertMaterial({ color: 0x78350f }));
+        const foliage = new THREE.Mesh(new THREE.ConeGeometry(2, 5, 8), new THREE.MeshLambertMaterial({ color: 0x15803d }));
+        const rx = (Math.random() - 0.5) * 120;
+        const rz = (Math.random() - 0.5) * 120;
+        trunk.position.set(rx, 1.5, rz);
+        foliage.position.set(rx, 5, rz);
+        scene.add(trunk); scene.add(foliage);
+      }
+    }
+
+    function handleKey(code, isDown) {
+      if (code === 'KeyW' || code === 'ArrowUp') keys.w = isDown;
+      if (code === 'KeyS' || code === 'ArrowDown') keys.s = isDown;
+      if (code === 'KeyA' || code === 'ArrowLeft') keys.a = isDown;
+      if (code === 'KeyD' || code === 'ArrowRight') keys.d = isDown;
+      if (code === 'Space' && isDown && isNearNPC) triggerDialogue();
+    }
+
+    function setupTouchControls() {
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        document.getElementById('dpad').style.display = 'grid';
+      }
+      const bindTouch = (id, keyProp) => {
+        const el = document.getElementById(id);
+        el.addEventListener('touchstart', (e) => { e.preventDefault(); touchMove[keyProp] = true; });
+        el.addEventListener('touchend', (e) => { e.preventDefault(); touchMove[keyProp] = false; });
+      };
+      bindTouch('btn-up', 'up'); bindTouch('btn-down', 'down');
+      bindTouch('btn-left', 'left'); bindTouch('btn-right', 'right');
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const speed = 0.15;
+      const rotSpeed = 0.04;
+
+      if (keys.w || touchMove.up) player.translateZ(-speed);
+      if (keys.s || touchMove.down) player.translateZ(speed);
+      if (keys.a || touchMove.left) player.rotation.y += rotSpeed;
+      if (keys.d || touchMove.right) player.rotation.y -= rotSpeed;
+
+      const camOffset = new THREE.Vector3(0, 5, 10).applyMatrix4(player.matrixWorld);
+      camera.position.lerp(camOffset, 0.1);
+      camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
+
+      let near = false;
+      npcs.forEach((npc, idx) => {
+        const dist = player.position.distanceTo(npc.position);
+        if (dist < 3.5) { near = true; activeNPCIdx = idx; }
+      });
+
+      isNearNPC = near;
+      document.getElementById('talk-btn').style.display = isNearNPC ? 'block' : 'none';
+
+      renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    /* ==========================================================================
+       5. GAMEPLAY & DIALOGUE ENGINE
+       ========================================================================== */
+    function startGame() {
+      playSFX('click');
+      const name = document.getElementById('input-name').value.trim();
+      const cls = document.getElementById('input-class').value.trim();
+      const day = document.getElementById('input-day').value.trim();
+
+      if (!name || !cls || !day) {
+        alert("Please fill in all details before starting!");
+        return;
+      }
+
+      playerData.name = name; playerData.class = cls; playerData.day = day;
+      playerData.startTime = Date.now();
+
+      document.getElementById('login-screen').style.display = 'none';
+
+      const bgm = document.getElementById('bgm');
+      bgm.volume = 0.4;
+      bgm.play().catch(() => {});
+
+      timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - playerData.startTime) / 1000);
+        playerData.totalTimeSec = elapsed;
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+        document.getElementById('hud-timer').innerText = `${mins}:${secs}`;
+      }, 1000);
+
+      init3D();
+    }
+
+    function triggerDialogue() {
+      playSFX('click');
+      currentUnitIdx = activeNPCIdx;
+      document.getElementById('hud-unit').innerText = `${UNITS[currentUnitIdx].emoji} ${currentUnitIdx + 1} / 4`;
+
+      const prog = unitProgress[currentUnitIdx];
+      const unit = UNITS[currentUnitIdx];
+
+      document.getElementById('vn-speaker').innerText = `${unit.emoji} ${unit.npcName}`;
+      document.getElementById('vn-portrait').src = unit.poses.neutral;
+      document.getElementById('vn-overlay').style.display = 'flex';
+      document.getElementById('vn-box').classList.remove('shake');
+
+      if (!prog.visited) {
+        showCharacterGreeting();
+      } else if (!prog.cleared) {
+        loadParagraphGame();
+      } else {
+        loadCompletedView();
+      }
+    }
+
+    function showCharacterGreeting() {
+      const unit = UNITS[currentUnitIdx];
+      unitProgress[currentUnitIdx].visited = true;
+      document.getElementById('vn-stage-title').innerText = "✨ Introduction";
+
+      const body = document.getElementById('vn-body');
+      body.innerHTML = `
+        <p class="pop-in" style="font-size:1rem; line-height:1.55; color:#f8fafc; margin-bottom:10px;">${unit.greeting}</p>
+        <div class="vn-controls">
+          <button class="btn-action btn-fun" onclick="playSFX('click'); loadParagraphGame();">🚀 Start Puzzle!</button>
+        </div>
+      `;
+    }
+
+    /* ---------- PARAGRAPH-ARRANGING GAME ---------- */
+
+    function slotLabel(unit, i) {
+      const total = unit.sentences.length;
+      if (i === 0) return '🏁 Topic Sentence';
+      if (i === total - 1) return '🎯 Concluding Sentence';
+      return `Body Sentence ${i}`;
+    }
+
+    function loadParagraphGame() {
+      const unit = UNITS[currentUnitIdx];
+      document.getElementById('vn-stage-title').innerText = "🧩 Arrange the Paragraph";
+
+      const letters = "ABCDEFGH".split("").slice(0, unit.sentences.length);
+      const sentenceTexts = unit.sentences.map(s => s.join(" "));
+
+      sentencePool = letters.map((letter, i) => ({ letter, text: sentenceTexts[i] }));
+      sentencePool.sort(() => Math.random() - 0.5);
+
+      slots = new Array(unit.sentences.length).fill(null);
+      renderParagraphGame();
+    }
+
+    function renderParagraphGame() {
+      const unit = UNITS[currentUnitIdx];
+      const placedCount = slots.filter(s => s && s.locked).length;
+
+      const slotsHtml = slots.map((s, i) => {
+        if (!s) {
+          return `<div class="slot empty" data-slot="${i}" ondragover="onSlotDragOver(event)" ondragleave="onSlotDragLeave(event)" ondrop="onSlotDrop(event, ${i})">
+            <span class="slot-placeholder">${slotLabel(unit, i)}</span>
+          </div>`;
+        }
+        const lockedCls = s.locked ? 'locked' : '';
+        const dragAttrs = s.locked ? '' : `draggable="true" ondragstart="onSlotDragStart(event, ${i})"`;
+        return `<div class="slot filled ${lockedCls}" data-slot="${i}" ${dragAttrs}
+            ondragover="onSlotDragOver(event)" ondragleave="onSlotDragLeave(event)" ondrop="onSlotDrop(event, ${i})"
+            onclick="${s.locked ? '' : `unplaceSentence(${i})`}">
+          <span class="letter-badge ${lockedCls}">${s.letter}</span>
+          <span class="slot-text">${s.text}</span>
+          ${s.locked ? '<span class="lock-check">✅</span>' : '<span class="slot-hint">tap to remove</span>'}
+        </div>`;
+      }).join('');
+
+      const poolHtml = sentencePool.map((s) => `
+        <div class="pool-card" draggable="true"
+             ondragstart="onPoolDragStart(event, '${s.letter}')"
+             onclick="placeSentence('${s.letter}')">
+          <span class="letter-badge">${s.letter}</span>
+          <span class="slot-text">${s.text}</span>
+        </div>`).join('');
+
+      const body = document.getElementById('vn-body');
+      body.innerHTML = `
+        <p style="font-size:0.82rem; color:#cbd5e1;">🖱️ Drag <em>or</em> tap a lettered card into its box below. <strong style="color:#4ade80;">Topic sentence on top</strong>, <strong style="color:#f59e0b;">concluding sentence at the bottom!</strong></p>
+
+        <div class="progress-track"><div class="progress-fill" style="width:${(placedCount / unit.sentences.length) * 100}%"></div></div>
+        <p style="font-size:0.75rem; color:#94a3b8; margin:2px 0 6px;">${placedCount} / ${unit.sentences.length} sentences locked ✓</p>
+
+        <p style="font-size:0.8rem; color:#60a5fa; font-weight:bold;">📜 Your Paragraph:</p>
+        <div class="target-paragraph" id="slot-zone" style="flex-direction:column; align-items:stretch;">
+          ${slotsHtml}
+        </div>
+
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:8px;">🃏 Sentence Cards:</p>
+        <div class="sentence-pool" id="pool-zone" style="flex-direction:column; align-items:stretch;"
+             ondragover="onSlotDragOver(event)" ondrop="onPoolDrop(event)">
+          ${poolHtml || '<p style="font-size:0.8rem;color:#64748b;text-align:center;padding:6px;">All cards placed — hit Confirm! 👇</p>'}
+        </div>
+
+        <div class="vn-controls">
+          <button class="btn-action btn-fun" onclick="checkParagraph()">✅ Confirm Order</button>
+        </div>
+      `;
+    }
+
+    function placeSentence(letter) {
+      const idx = sentencePool.findIndex(s => s.letter === letter);
+      if (idx === -1) return;
+      const firstEmpty = slots.findIndex(s => s === null);
+      if (firstEmpty === -1) return;
+      playSFX('click');
+      const card = sentencePool.splice(idx, 1)[0];
+      slots[firstEmpty] = { letter: card.letter, text: card.text, locked: false };
+      renderParagraphGame();
+    }
+
+    function unplaceSentence(idx) {
+      const s = slots[idx];
+      if (!s || s.locked) return;
+      playSFX('click');
+      sentencePool.push({ letter: s.letter, text: s.text });
+      slots[idx] = null;
+      renderParagraphGame();
+    }
+
+    /* Drag and drop handlers (desktop + touch-capable browsers) */
+    function onPoolDragStart(e, letter) {
+      dragLetter = letter;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', letter);
+    }
+    function onSlotDragStart(e, fromIdx) {
+      const s = slots[fromIdx];
+      if (!s || s.locked) { e.preventDefault(); return; }
+      dragLetter = s.letter;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', s.letter);
+    }
+    function onSlotDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+    function onSlotDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+    function onSlotDrop(e, toIdx) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      if (slots[toIdx] && slots[toIdx].locked) return;
+      const letter = dragLetter || e.dataTransfer.getData('text/plain');
+      if (!letter) return;
+      playSFX('click');
+
+      let card = null;
+      const poolIdx = sentencePool.findIndex(s => s.letter === letter);
+      if (poolIdx !== -1) {
+        card = sentencePool.splice(poolIdx, 1)[0];
+      } else {
+        const fromIdx = slots.findIndex(s => s && s.letter === letter);
+        if (fromIdx !== -1) { card = slots[fromIdx]; slots[fromIdx] = null; }
+      }
+      if (!card) return;
+
+      if (slots[toIdx]) sentencePool.push({ letter: slots[toIdx].letter, text: slots[toIdx].text });
+      slots[toIdx] = { letter: card.letter, text: card.text, locked: false };
+      dragLetter = null;
+      renderParagraphGame();
+    }
+    function onPoolDrop(e) {
+      e.preventDefault();
+      const letter = dragLetter || e.dataTransfer.getData('text/plain');
+      if (!letter) return;
+      const fromIdx = slots.findIndex(s => s && s.letter === letter && !s.locked);
+      if (fromIdx === -1) return;
+      playSFX('click');
+      sentencePool.push({ letter: slots[fromIdx].letter, text: slots[fromIdx].text });
+      slots[fromIdx] = null;
+      dragLetter = null;
+      renderParagraphGame();
+    }
+
+    function checkParagraph() {
+      const unit = UNITS[currentUnitIdx];
+      const correctList = unit.sentences.map(s => s.join(" "));
+
+      if (slots.some(s => s === null)) {
+        playSFX('wrong');
+        shakeBox();
+        alert("Fill every box first! Drag or tap all the sentence cards into place. 🧩");
+        return;
+      }
+
+      let allCorrect = true;
+      for (let i = 0; i < slots.length; i++) {
+        if (slots[i].text === correctList[i]) {
+          slots[i].locked = true;
+        } else {
+          allCorrect = false;
+        }
+      }
+
+      if (allCorrect) {
+        playSFX('correct');
+        launchConfetti();
+        unitProgress[currentUnitIdx].cleared = true;
+        document.getElementById('vn-portrait').src = unit.poses.happy;
+        renderParagraphGame();
+
+        setTimeout(() => {
+          if (unitProgress.every(u => u.cleared)) {
+            showEndGameScreen();
+          } else {
+            loadCompletedView();
+          }
+        }, 1200);
+      } else {
+        playSFX('wrong');
+        shakeBox();
+        document.getElementById('vn-portrait').src = unit.poses.thinking;
+        // Return any wrong (unlocked) cards to the pool so the player can retry
+        for (let i = slots.length - 1; i >= 0; i--) {
+          if (slots[i] && !slots[i].locked) {
+            sentencePool.push({ letter: slots[i].letter, text: slots[i].text });
+            slots[i] = null;
+          }
+        }
+        renderParagraphGame();
+      }
+    }
+
+    function shakeBox() {
+      const el = document.getElementById('vn-box');
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+    }
+
+    function launchConfetti() {
+      const emojis = ['🎉', '⭐', '✨', '🎊', '🏆'];
+      for (let i = 0; i < 24; i++) {
+        const span = document.createElement('span');
+        span.className = 'confetti-piece';
+        span.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+        span.style.left = Math.random() * 100 + 'vw';
+        span.style.animationDuration = (1.2 + Math.random() * 1.2) + 's';
+        span.style.fontSize = (1 + Math.random() * 1.2) + 'rem';
+        document.body.appendChild(span);
+        setTimeout(() => span.remove(), 2600);
+      }
+    }
+
+    function loadCompletedView() {
+      const unit = UNITS[currentUnitIdx];
+      document.getElementById('vn-stage-title').innerText = "🏆 Unit Cleared!";
+
+      const body = document.getElementById('vn-body');
+      body.innerHTML = `
+        <p class="pop-in" style="color:#4ade80; font-weight:bold; font-size:1rem;">${unit.emoji} Great job! Here's the full paragraph, perfectly in order:</p>
+        <div id="full-text-display">${unit.fullParagraph}</div>
+        <div class="vn-controls">
+          <button class="btn-action btn-fun" onclick="playSFX('click'); closeVN();">🏠 Return to Town</button>
+        </div>
+      `;
+    }
+
+    function closeVN() {
+      document.getElementById('vn-overlay').style.display = 'none';
+    }
+
+    function showEndGameScreen() {
+      playSFX('win');
+      launchConfetti();
+      clearInterval(timerInterval);
+      document.getElementById('vn-overlay').style.display = 'none';
+
+      document.getElementById('res-name').innerText = playerData.name;
+      document.getElementById('res-class').innerText = playerData.class;
+      document.getElementById('res-day').innerText = playerData.day;
+
+      const mins = String(Math.floor(playerData.totalTimeSec / 60)).padStart(2, '0');
+      const secs = String(playerData.totalTimeSec % 60).padStart(2, '0');
+      document.getElementById('res-time').innerText = `${mins}:${secs}`;
+
+      document.getElementById('end-screen').style.display = 'flex';
+    }
+  </script>
+</body>
+</html>
