@@ -101,6 +101,23 @@
     #vn-speaker { font-size: 1.1rem; font-weight: bold; color: #60a5fa; }
     #vn-stage-title { font-size: 0.85rem; color: #f59e0b; font-weight: bold; }
 
+    /* Stage 1: word-chip styling */
+    .word-pool {
+      display: flex; flex-wrap: wrap; gap: 8px; min-height: 44px; padding: 8px;
+      background: #0f172a; border: 1px dashed #475569; border-radius: 12px; margin-top: 4px;
+    }
+    #selected-box.target-paragraph { min-height: 52px; align-items: center; }
+
+    .word-chip {
+      padding: 8px 14px; background: #334155; border: 2px solid #64748b; border-radius: 10px;
+      color: #fff; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+      animation: popIn 0.2s ease;
+    }
+    .word-chip.first-word { background: #15803d; border-color: #22c55e; color: #fff; }
+    .word-chip.last-word { background: #a16207; border-color: #f59e0b; color: #fff; }
+    .word-chip:active { transform: scale(0.93); }
+    .word-chip:hover { filter: brightness(1.15); }
+
     /* Interactive Elements in VN */
     .sentence-pool, .target-paragraph {
       display: flex; flex-wrap: wrap; gap: 8px; min-height: 44px; padding: 8px;
@@ -335,7 +352,7 @@
     const UNITS = [
       {
         id: 1, title: "Safe Internet Tips", npcName: "Alex", emoji: "🛡️",
-        greeting: "Hey there! 👋 I'm Alex. My Internet Safety Guide got all mixed up! Can you drag the sentence cards into the right order? Remember: topic sentence on top, concluding sentence at the bottom!",
+        greeting: "Hey there! 👋 I'm Alex. First, help me rebuild each scrambled sentence word-by-word. Then we'll drag all the sentences into the right paragraph order — topic sentence on top, conclusion at the bottom!",
         poses: { neutral: "alex_neutral.png", thinking: "alex_thinking.png", happy: "alex_happy.png" },
         fullParagraph: "The Internet is useful, but we should use it carefully. Cyber bullying can hurt people, so we should not send mean messages to others. We should also be careful when talking to a stranger online. Some people share a hoax, so we should check information before we believe it. We should never give our password to someone because it may be a phishing attack or a romance scam. Sometimes, a computer can crash because it is infected with a virus. Fake websites can also steal our personal information. We should follow these simple tips to stay safe on the Internet.",
         sentences: [
@@ -351,7 +368,7 @@
       },
       {
         id: 2, title: "Movie Review", npcName: "Maya", emoji: "🎬",
-        greeting: "Hi! 🎬 I'm Maya. I dropped my movie review cards everywhere! Help me put them back in order — topic sentence first, conclusion last!",
+        greeting: "Hi! 🎬 I'm Maya. My movie review words got all jumbled up! First rebuild each sentence, then arrange them into the full review — topic sentence first, conclusion last!",
         poses: { neutral: "maya_neutral.png", thinking: "maya_thinking.png", happy: "maya_happy.png" },
         fullParagraph: "Last weekend, I watched an exciting movie with my friends. The movie was about a hero who saved his city from a dangerous monster. The story was epic, and the special effects were brilliant. I was very excited when the hero fought the monster. However, some parts were boring because the story was too slow. The romantic scenes were also a little cheesy and predictable. Overall, I thought the movie was excellent, although some people might think it was terrible. I would recommend this movie to people who enjoy exciting action stories.",
         sentences: [
@@ -367,7 +384,7 @@
       },
       {
         id: 3, title: "Collecting Items", npcName: "Sam", emoji: "⚽",
-        greeting: "Welcome! ⚽ I'm Sam. My story about my football card collection is totally scrambled! Can you arrange the sentence cards in the correct order?",
+        greeting: "Welcome! ⚽ I'm Sam. My story words got scattered everywhere! Rebuild each sentence first, then arrange them into the correct paragraph order.",
         poses: { neutral: "sam_neutral.png", thinking: "sam_thinking.png", happy: "sam_happy.png" },
         fullParagraph: "I started collecting football cards when I was twelve years old. Last year, I went hunting for collectibles at a small market near my house. I found three old cards, but I did not buy them because they were too expensive. My favorite card was my brother's, but he gave it to me for my birthday. I also bought a special card from a collector in Jakarta. I was very happy because the card was from my favorite football team. Collecting cards has given me many interesting experiences. Now, I want to find more rare cards and share my collection with an online community.",
         sentences: [
@@ -383,7 +400,7 @@
       },
       {
         id: 4, title: "Holiday Food", npcName: "Mayor", emoji: "🍽️",
-        greeting: "Greetings! 🍽️ I am the Mayor. Our holiday food story got scrambled before the feast! Please drag the sentence cards into the correct order to save the day!",
+        greeting: "Greetings! 🍽️ I am the Mayor. Our holiday food words got scrambled before the feast! Rebuild each sentence first, then arrange them into the correct order to save the day!",
         poses: { neutral: "mayor_neutral.png", thinking: "mayor_thinking.png", happy: "mayor_happy.png" },
         fullParagraph: "During Eid, my family prepares many delicious foods for our holiday celebration. One of my favorite foods is rendang, which is made with beef, coconut milk, and spices. The meat is tender, rich, and very flavorful. My mother usually puts together the ingredients and cooks the rendang for several hours. We also serve rice, vegetables, and traditional snacks for our guests. The food smells wonderful, and everyone enjoys eating together. My favorite part is when our relatives come over and we share the holiday meal. For me, holiday food is special because it brings family and friends together.",
         sentences: [
@@ -406,13 +423,17 @@
     let timerInterval = null;
     let currentUnitIdx = 0;
     let unitProgress = [
-      { visited: false, cleared: false },
-      { visited: false, cleared: false },
-      { visited: false, cleared: false },
-      { visited: false, cleared: false }
+      { visited: false, clearedStage1: false, clearedStage2: false, sentenceIdx: 0 },
+      { visited: false, clearedStage1: false, clearedStage2: false, sentenceIdx: 0 },
+      { visited: false, clearedStage1: false, clearedStage2: false, sentenceIdx: 0 },
+      { visited: false, clearedStage1: false, clearedStage2: false, sentenceIdx: 0 }
     ];
 
-    let sentencePool = [];   // [{ letter, text }] sentence cards waiting to be placed
+    let currentSentenceIdx = 0;      // which sentence (within the unit) Stage 1 is building
+    let selectedWords = [];          // chunks the player has placed, in order, for the current sentence
+    let currentShuffledWords = [];   // remaining shuffled chunks for the current sentence
+
+    let sentencePool = [];   // [{ letter, text }] sentence cards waiting to be placed (Stage 2)
     let slots = [];          // length = unit.sentences.length; each null | { letter, text, locked }
     let dragLetter = null;   // letter currently being dragged
     let isNearNPC = false;
@@ -626,7 +647,10 @@
 
       if (!prog.visited) {
         showCharacterGreeting();
-      } else if (!prog.cleared) {
+      } else if (!prog.clearedStage1) {
+        currentSentenceIdx = prog.sentenceIdx;
+        loadStage1Sentence();
+      } else if (!prog.clearedStage2) {
         loadParagraphGame();
       } else {
         loadCompletedView();
@@ -642,12 +666,112 @@
       body.innerHTML = `
         <p class="pop-in" style="font-size:1rem; line-height:1.55; color:#f8fafc; margin-bottom:10px;">${unit.greeting}</p>
         <div class="vn-controls">
-          <button class="btn-action btn-fun" onclick="playSFX('click'); loadParagraphGame();">🚀 Start Puzzle!</button>
+          <button class="btn-action btn-fun" onclick="playSFX('click'); currentSentenceIdx = 0; loadStage1Sentence();">🚀 Start Puzzle!</button>
         </div>
       `;
     }
 
-    /* ---------- PARAGRAPH-ARRANGING GAME ---------- */
+    /* ---------- STAGE 1: WORD-JUMBLE → SENTENCE ---------- */
+
+    function loadStage1Sentence() {
+      const unit = UNITS[currentUnitIdx];
+      const originalChunks = [...unit.sentences[currentSentenceIdx]];
+      selectedWords = [];
+      currentShuffledWords = [...originalChunks].sort(() => Math.random() - 0.5);
+      document.getElementById('vn-stage-title').innerText = `🔤 Sentence ${currentSentenceIdx + 1} of ${unit.sentences.length}`;
+      renderStage1();
+    }
+
+    function renderStage1() {
+      const unit = UNITS[currentUnitIdx];
+      const targetSentence = unit.sentences[currentSentenceIdx];
+      const firstChunk = targetSentence[0];
+      const lastChunk = targetSentence[targetSentence.length - 1];
+
+      const progress = ((currentSentenceIdx) / unit.sentences.length) * 100;
+
+      const body = document.getElementById('vn-body');
+      body.innerHTML = `
+        <p style="font-size:0.82rem; color:#cbd5e1;">🧩 Tap the word chunks in the correct order to build the sentence:</p>
+
+        <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
+        <p style="font-size:0.75rem; color:#94a3b8; margin:2px 0 6px;">Sentence ${currentSentenceIdx + 1} / ${unit.sentences.length}</p>
+
+        <div class="target-paragraph" id="selected-box">
+          ${selectedWords.length === 0 ? '<span style="color:#64748b;font-size:0.8rem;font-style:italic;">Your sentence will build here...</span>' : ''}
+          ${selectedWords.map((w, i) => `<span class="word-chip" onclick="deselectWord(${i})">${w}</span>`).join('')}
+        </div>
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:6px;">🃏 Available Chunks (tap to insert):</p>
+        <div class="word-pool">
+          ${currentShuffledWords.map((w, i) => {
+            let cls = 'word-chip';
+            if (w === firstChunk) cls += ' first-word';
+            if (w === lastChunk) cls += ' last-word';
+            return `<span class="${cls}" onclick="selectWord(${i})">${w}</span>`;
+          }).join('')}
+        </div>
+        <p style="font-size:0.7rem; color:#94a3b8; margin-top:4px;">🟢 green = likely first &nbsp; 🟠 amber = likely last</p>
+        <div class="vn-controls">
+          <button class="btn-action secondary" onclick="playSFX('click'); resetStage1Words();">🔄 Reset</button>
+          <button class="btn-action btn-fun" onclick="checkStage1Sentence()">✅ Check Sentence</button>
+        </div>
+      `;
+    }
+
+    function selectWord(idx) {
+      playSFX('click');
+      const word = currentShuffledWords.splice(idx, 1)[0];
+      selectedWords.push(word);
+      renderStage1();
+    }
+
+    function deselectWord(idx) {
+      playSFX('click');
+      const word = selectedWords.splice(idx, 1)[0];
+      currentShuffledWords.push(word);
+      renderStage1();
+    }
+
+    function resetStage1Words() { loadStage1Sentence(); }
+
+    function checkStage1Sentence() {
+      const unit = UNITS[currentUnitIdx];
+      const target = unit.sentences[currentSentenceIdx].join(" ");
+      const current = selectedWords.join(" ");
+
+      if (current === target) {
+        playSFX('correct');
+        currentSentenceIdx++;
+        unitProgress[currentUnitIdx].sentenceIdx = currentSentenceIdx;
+
+        if (currentSentenceIdx >= unit.sentences.length) {
+          unitProgress[currentUnitIdx].clearedStage1 = true;
+          document.getElementById('vn-portrait').src = unit.poses.happy;
+          showStage1Complete();
+        } else {
+          loadStage1Sentence();
+        }
+      } else {
+        playSFX('wrong');
+        shakeBox();
+        document.getElementById('vn-portrait').src = unit.poses.thinking;
+      }
+    }
+
+    function showStage1Complete() {
+      const unit = UNITS[currentUnitIdx];
+      document.getElementById('vn-stage-title').innerText = "✅ All Sentences Built!";
+      const body = document.getElementById('vn-body');
+      body.innerHTML = `
+        <p class="pop-in" style="font-size:0.95rem; color:#4ade80; font-weight:bold;">🎉 Great job! You correctly built all ${unit.sentences.length} sentences!</p>
+        <p style="font-size:0.85rem; color:#cbd5e1; margin-top:6px;">Now let's put them in the right paragraph order — topic sentence first, concluding sentence last!</p>
+        <div class="vn-controls">
+          <button class="btn-action btn-fun" onclick="playSFX('click'); loadParagraphGame();">🧩 Arrange the Paragraph</button>
+        </div>
+      `;
+    }
+
+    /* ---------- STAGE 2: PARAGRAPH-ARRANGING GAME ---------- */
 
     function slotLabel(unit, i) {
       const total = unit.sentences.length;
@@ -822,12 +946,12 @@
       if (allCorrect) {
         playSFX('correct');
         launchConfetti();
-        unitProgress[currentUnitIdx].cleared = true;
+        unitProgress[currentUnitIdx].clearedStage2 = true;
         document.getElementById('vn-portrait').src = unit.poses.happy;
         renderParagraphGame();
 
         setTimeout(() => {
-          if (unitProgress.every(u => u.cleared)) {
+          if (unitProgress.every(u => u.clearedStage2)) {
             showEndGameScreen();
           } else {
             loadCompletedView();
